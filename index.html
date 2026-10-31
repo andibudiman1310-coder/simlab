@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIMLAB Puskesmas Sangasanga</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--tx:#1b2433;--mut:#6b7585;--ac:#1d5fd1;--bd:#e3e8f0;--side:#0f2a52}
+[data-theme=dark]{--bg:#0d1420;--card:#172233;--tx:#e8edf5;--mut:#9aa6b8;--ac:#4f8cff;--bd:#263449;--side:#0a1220}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx);display:flex;min-height:100vh}
+aside{width:220px;background:var(--side);color:#dbe6ff;padding:20px 12px;position:sticky;top:0;height:100vh;flex-shrink:0}
+aside h1{font-size:16px;margin:0 8px 18px}
+aside a{display:block;padding:10px 12px;border-radius:8px;color:inherit;text-decoration:none;margin-bottom:4px}
+aside a.on,aside a:hover{background:rgba(255,255,255,.12)}
+main{flex:1;padding:24px;min-width:0}
+h2{margin:0 0 4px;font-size:22px}
+h3.grp{margin:24px 0 10px;font-size:15px;color:var(--ac)}
+.sub{color:var(--mut);margin:0 0 16px;font-size:14px}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;min-width:0}
+.kpi b{font-size:26px;display:block}
+.kpi span{color:var(--mut);font-size:13px}
+.lnk{display:flex;flex-direction:column;gap:6px;text-decoration:none;color:inherit}
+.lnk:hover{border-color:var(--ac)}
+.tag{font-size:11px;background:var(--bg);border:1px solid var(--bd);border-radius:999px;padding:2px 8px;color:var(--mut);align-self:flex-start}
+.btn{background:var(--ac);color:#fff;border:0;border-radius:8px;padding:9px 14px;cursor:pointer;font-size:14px;display:inline-block}
+.btn.ghost{background:transparent;color:var(--ac);border:1px solid var(--ac)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+input,select,textarea{width:100%;padding:9px 10px;border:1px solid var(--bd);border-radius:8px;background:var(--card);color:var(--tx);font:inherit;margin:4px 0 12px}
+label{font-size:13px;color:var(--mut)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.two{grid-template-columns:1fr 1fr}
+table{border-collapse:collapse;font-size:13px}
+td,th{border:1px solid var(--bd);padding:4px 6px;white-space:nowrap;min-width:60px}
+th{background:var(--bg);position:sticky;top:0}
+td input{border:0;margin:0;padding:4px;width:auto;min-width:70px;background:transparent}
+td input.chg{background:rgba(255,200,0,.25)}
+.scroll{overflow:auto;max-height:560px;margin-top:12px}
+.item{padding:10px 0;border-bottom:1px solid var(--bd);display:flex;gap:10px;align-items:flex-start}
+.item:last-child{border:0}
+.toast{position:fixed;bottom:20px;right:20px;background:#222;color:#fff;padding:10px 14px;border-radius:8px;font-size:14px;display:none;max-width:380px;z-index:9}
+@media(max-width:800px){body{flex-direction:column}aside{width:auto;height:auto;position:static}.two{grid-template-columns:1fr!important}}
+</style>
+</head>
+<body>
+<aside>
+  <h1>SIMLAB Sangasanga</h1>
+  <a href="#beranda" data-v="beranda">Dashboard</a>
+  <a href="#data" data-v="data">Data &amp; Edit</a>
+  <a href="#tautan" data-v="tautan">Tautan</a>
+  <a href="#tugas" data-v="tugas">Tugas &amp; Kalender</a>
+  <a href="#pengaturan" data-v="pengaturan">Pengaturan</a>
+</aside>
+<main id="app"></main>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ KONFIGURASI ============ */
+const DEF={sheetId:'1tjKSA3KUUer966CWD_uuGVbPJr_kbJOooGoQ18fveuQ',clientId:'',calId:'primary',taskListId:'',lab:'UPTD Puskesmas Sanga-sanga',theme:'light'};
+let cfg={...DEF,...JSON.parse(localStorage.getItem('simlab_cfg')||'{}')};
+const SCOPES='https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/tasks';
+const TABS=['MUTU - REKAP TAHUNAN indikator','MUTU - DATA PER PEMERIKSAAN mut','LAPORAN - LAPORAN TAHUNAN LAB','LABSTOK - PETUNJUK','LABSTOK - MASTER REAGEN','LABSTOK - LOG TRANSAKSI','LABSTOK - STOK OPNAME','LABSTOK - DAFTAR PEMERIKSAAN','LABSTOK - LAB JAN','LABSTOK - LAB FEB','LABSTOK - LAB MAR','LABSTOK - LAB APR','LABSTOK - LAB MEI','LABSTOK - LAB JUN','LABSTOK - LAB JUL','LABSTOK - LAB AGU','LABSTOK - LAB SEP','LABSTOK - LAB OKT','LABSTOK - LAB NOV','LABSTOK - LAB DES','LABSTOK - REKAP TAHUNAN','LABSTOK - INPUT KELURAHAN','LABSTOK - REKAP KELURAHAN','SDQC - data kontrol heamtologi','SDQC - data kontrol kimia klini','LOGBOK - Sheet1'];
+const G1='Laporan & Profil',G2='Aplikasi & Sistem Input Pelaporan',G3='Stok, Peralatan & Kontrol Mutu',G4='Portal Daerah & Organisasi Profesi',G5='Catatan & Kalender';
+const LINKS=[
+{g:G1,n:'Laporan Lab Dinkes 2025',j:'Google Spreadsheet',k:'Spreadsheet Google Sheets',u:'https://docs.google.com/spreadsheets/d/1B-t4mJUyoYu9nfMaUtUBodXyAyhjAQt9SM8aZPrp1eo/edit?pli=1&gid=926263035#gid=926263035'},
+{g:G1,n:'Laporan Lab Dinkes 2026',j:'Google Spreadsheet',k:'Spreadsheet Google Sheets',u:'https://docs.google.com/spreadsheets/d/1PkluZtQhLRpKCHIXZB0O_bZYO1Zu_InMjYQ0mz1mc64/edit?gid=1422117293#gid=1422117293'},
+{g:G1,n:'Profil Labkesmas 2025',j:'Google Spreadsheet',k:'Spreadsheet Google Sheets',u:'https://docs.google.com/spreadsheets/d/1FhQ2jCshZnxTlpWAaSbmGYWH-4pds9_BZakWUj0fPgA/edit?gid=75482110#gid=75482110'},
+{g:G1,n:'Logbook Alat Lab',j:'Google Spreadsheet',k:'Spreadsheet Google Sheets',u:'https://docs.google.com/spreadsheets/d/1zCCMZsa4Fcf-pYirrqIpPws3VdZFYW3eo-2VDhH4y0I/edit?gid=1156050446#gid=1156050446'},
+{g:G1,n:'Form Hasil Lab PKM Sanga-sanga',j:'Google Spreadsheet',k:'Spreadsheet Google Sheets',u:'https://docs.google.com/spreadsheets/d/12CArNFYDd0HzPs9nB-735EVE9pbyY3AatEq6xuG13W4/edit?gid=707316538#gid=707316538'},
+{g:G1,n:'Profil Lab 2017-2019',j:'Folder Google Drive',k:'Google Drive Folder',u:'https://drive.google.com/drive/folders/15PPx5AWBJ66Hf7Cwf3jChfQY-aADDKRw?usp=drive_link'},
+{g:G1,n:'Form Pemetaan Lab 2020-2025',j:'Folder Google Drive',k:'Google Drive Folder',u:'https://drive.google.com/drive/folders/1LxOXeWpnMWY8SFb89Jv6JrLBKikapMYn?usp=drive_link'},
+{g:G2,n:'E-Puskesmas',j:'Aplikasi / Web',k:'Sistem Informasi Puskesmas',u:'https://kutaikartanegara.epuskesmas.id/laboratorium'},
+{g:G2,n:'Input SITB',j:'Aplikasi / Web',k:'Sistem Informasi Tuberkulosis',u:'https://kalimantan.sitb.id/sitb2024/app'},
+{g:G2,n:'Input SIHA',j:'Aplikasi / Web',k:'Sistem Informasi HIV AIDS',u:'https://sihapims2.kemkes.go.id/home'},
+{g:G2,n:'Input SIHEPI',j:'Aplikasi / Web',k:'Sistem Hepatitis & PIMS',u:'https://sihepi.kemkes.go.id/login'},
+{g:G2,n:'Register TCM dan Follow Up',j:'Google Spreadsheet',k:'Spreadsheet Google Sheets',u:'https://docs.google.com/spreadsheets/d/1trrjzvtV7DNd8Iz-GWLps1plGz1XpPB9u20azQvE8yA/edit?gid=456419856#gid=456419856'},
+{g:G2,n:'ETB 12',j:'Aplikasi / Web',k:'Formulir Pelaporan TB',u:'http://etb12app.sitb.id/login'},
+{g:G2,n:'Rekap TCM',j:'Google Spreadsheet',k:'Spreadsheet Google Sheets',u:'https://docs.google.com/spreadsheets/d/1y-YBm1BIy4meDpYETcJHnM1T-uscCVfA/edit?gid=122836114#gid=122836114'},
+{g:G2,n:'Capaian HIV',j:'Google Spreadsheet',k:'Spreadsheet Google Sheets',u:'https://docs.google.com/spreadsheets/d/1RO7pH6r_HMorcMkvhyzXf0XaLW0fG208/edit?gid=725900174#gid=725900174'},
+{g:G3,n:'Medical Equipment',j:'Google Apps Script WebApp',k:'Google AppsScript WebApp',u:'https://script.google.com/macros/s/AKfycbyEiD91ZY6ji3D6DPpAOpQHqSSeXJNOTeuPkqSyiJIRXiS0378mK59qPWVU3zVj1sUo/exec'},
+{g:G4,n:'SI PECI',j:'Aplikasi / Web',k:'Kutai Kartanegara',u:'https://peci.kukarkab.go.id/login'},
+{g:G4,n:'Bangkom',j:'Aplikasi / Web',k:'Pengembangan Kompetensi',u:'https://bangkom.kukarkab.go.id/app/dashboard'},
+{g:G4,n:'Link PKM Sanga-sanga',j:'Aplikasi / Web',k:'Portal Pelaporan Puskesmas',u:'https://s.id/link_pelaporan99'},
+{g:G4,n:'Smart PATELKI',j:'Aplikasi / Web',k:'Organisasi Profesi ATLM',u:'https://patelki.com/login'},
+{g:G4,n:'Satu Sehat SDMK',j:'Aplikasi / Web',k:'SDM Kesehatan',u:'https://satusehat.kemkes.go.id/sdmk/login'},
+{g:G4,n:'Praktis',j:'Aplikasi / Web',k:'Absen Praktis',u:'https://praktis.kukarkab.go.id/auth/login'},
+{g:G4,n:'Reset Device Praktis',j:'Google Form',k:'Reset Aplikasi',u:'https://docs.google.com/forms/d/e/1FAIpQLSd2yN1mApB1X_lkKVJ3ikE6SZlufOr5H5A4Nq57rMVd6EjHTg/viewform'},
+{g:G4,n:'Panduan Reset Praktis',j:'Google Spreadsheet',k:'Q&A Praktis',u:'https://docs.google.com/spreadsheets/d/1z5GgDUQt2bkbeXnh4wAoKHW9QtAjob8uxui-lcOG6Iw/edit?gid=531613367#gid=531613367'},
+{g:G5,n:'Google Calendar',j:'Layanan Google',k:'Catatan Kalender',u:'https://calendar.google.com/calendar/u/0/r'},
+{g:G5,n:'Google Tasks',j:'Layanan Google',k:'Catatan Harian',u:'https://tasks.google.com/tasks/'}
+];
+
+/* ============ UTILITAS ============ */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',3800)}
+function applyTheme(){document.documentElement.dataset.theme=cfg.theme}
+const kpi=(v,l)=>`<div class="card kpi"><b>${v}</b><span>${esc(l)}</span></div>`;
+const num=s=>{const n=parseInt(String(s).replace(/\./g,'').replace(/,.*/,''),10);return isNaN(n)?0:n};
+const pct=s=>{const n=parseFloat(String(s).replace('%','').replace(',','.'));return isNaN(n)?0:n};
+const colL=i=>{let s='';i++;while(i>0){const m=(i-1)%26;s=String.fromCharCode(65+m)+s;i=Math.floor((i-1)/26)}return s};
+
+/* ============ GOOGLE AUTH ============ */
+let tokenClient=null,token=null,tokenExp=0;
+function initGoogle(){
+  if(!window.google?.accounts||!cfg.clientId||tokenClient) return;
+  tokenClient=google.accounts.oauth2.initTokenClient({client_id:cfg.clientId,scope:SCOPES,callback:r=>{
+    if(r.error){toast('Gagal masuk: '+r.error);return}
+    token=r.access_token;tokenExp=Date.now()+(r.expires_in-60)*1000;route();
+  }});
+}
+function signIn(){ if(!tokenClient){toast('Isi Client ID di Pengaturan lalu simpan.');return} tokenClient.requestAccessToken(); }
+const signedIn=()=>token&&Date.now()<tokenExp;
+async function gapi(url,opt={}){
+  if(!signedIn()) throw new Error('Belum masuk Google');
+  const r=await fetch(url,{method:opt.method||'GET',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:opt.body?JSON.stringify(opt.body):undefined});
+  if(!r.ok) throw new Error(r.status+': '+(await r.text()).slice(0,160));
+  return r.status===204?null:r.json();
+}
+
+/* ============ BACA DATA SHEET ============ */
+function parseCSV(t){
+  const rows=[];let row=[],f='',q=false;
+  for(let i=0;i<t.length;i++){
+    const c=t[i];
+    if(q){if(c==='"'){if(t[i+1]==='"'){f+='"';i++}else q=false}else f+=c}
+    else if(c==='"') q=true;
+    else if(c===','){row.push(f);f=''}
+    else if(c==='\n'){row.push(f);rows.push(row);row=[];f=''}
+    else if(c!=='\r') f+=c;
+  }
+  if(f||row.length){row.push(f);rows.push(row)}
+  return rows;
+}
+const cache={};
+async function fetchTab(name){
+  if(cache[name]) return cache[name];
+  const r=await fetch(`https://docs.google.com/spreadsheets/d/${encodeURIComponent(cfg.sheetId)}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(name)}`);
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const t=await r.text();
+  if(t.trim().startsWith('<')) throw new Error('Sheet belum dibagikan (Anyone with the link – Viewer).');
+  return cache[name]=parseCSV(t);
+}
+// Grid lengkap dengan posisi sel (baris 0 = baris 1 di sheet), dipakai saat mengedit
+async function fetchGrid(name){
+  const d=await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(cfg.sheetId)}/values/${encodeURIComponent("'"+name+"'")}!A1:AA1000?valueRenderOption=FORMATTED_VALUE`);
+  return d.values||[];
+}
+
+/* ============ DASHBOARD ============ */
+let dash=null;
+async function loadDash(){
+  const out={};
+  const mutu=await fetchTab('MUTU - REKAP TAHUNAN indikator');
+  out.mutu=mutu.filter(r=>(r[1]==='2025'||r[1]==='2026')&&r[2]&&r[3]).map(r=>({l:r[2].slice(0,3)+' '+r[1].slice(2),m:r[2].slice(0,3),v:pct(r[3])}));
+  const rek=await fetchTab('LABSTOK - REKAP TAHUNAN');
+  const tb=rek.find(r=>r[0]==='Total bulanan');
+  out.bulan=tb?tb.slice(2,14).map((v,i)=>({l:['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'][i],v:num(v)})):[];
+  out.jenis=rek.filter(r=>r[0]&&r[1]&&r[0]!=='Total bulanan'&&r[0]!=='Kategori'&&r[14]&&num(r[14])>0)
+    .map(r=>({l:r[1],v:num(r[14])})).sort((a,b)=>b.v-a.v).slice(0,8);
+  const stok=await fetchTab('LABSTOK - STOK OPNAME');
+  const hi=stok.findIndex(r=>r.includes('Status'));
+  const st={AMAN:0,ORDER:0,HABIS:0,NONAKTIF:0};
+  if(hi>=0) stok.slice(hi+1).forEach(r=>{const s=(r[hi]||'').trim().split(' ')[0];if(s&&r[1]&&s in st)st[s]++});
+  out.stok=st;
+  const lap=await fetchTab('LAPORAN - LAPORAN TAHUNAN LAB');
+  const hdr=lap.find(r=>r[1]==='WILAYAH KERJA');
+  const tot=lap.find(r=>r[1]==='Total Kunjungan');
+  out.kunjungan=hdr&&tot?hdr.map((h,i)=>({h,i})).filter(x=>/^TAHUN \d{4}$/.test(x.h)).map(x=>({l:x.h.slice(6),v:num(tot[x.i])})):[];
+  out.tglMuat=new Date().toLocaleString('id-ID');
+  return out;
+}
+function bars(items,h=170,unit=''){
+  if(!items.length) return '<p class="sub">Data belum tersedia.</p>';
+  const max=Math.max(1,...items.map(x=>x.v));const w=44;
+  return `<svg viewBox="0 0 ${items.length*w} ${h+34}" width="100%" role="img">${items.map((x,i)=>{const bh=Math.max(0,x.v/max*h);return `<rect x="${i*w+8}" y="${h-bh}" width="28" height="${bh}" rx="3" fill="var(--ac)"><title>${esc(x.l)}: ${x.v}${unit}</title></rect><text x="${i*w+22}" y="${h-bh-4}" font-size="10" text-anchor="middle" fill="var(--tx)">${x.v}</text><text x="${i*w+22}" y="${h+14}" font-size="10" text-anchor="middle" fill="var(--mut)">${esc(x.l)}</text>`}).join('')}</svg>`;
+}
+function hbars(items){
+  if(!items.length) return '<p class="sub">Data belum tersedia.</p>';
+  const max=Math.max(1,...items.map(x=>x.v));
+  return items.map(x=>`<div style="margin:8px 0"><div class="row" style="justify-content:space-between;font-size:13px"><span>${esc(x.l)}</span><b>${x.v}</b></div><div style="background:var(--bg);border-radius:6px;height:10px"><div style="width:${x.v/max*100}%;height:10px;border-radius:6px;background:var(--ac)"></div></div></div>`).join('');
+}
+function vBeranda(){
+  const d=dash;
+  if(!d) return `<h2>Dashboard</h2><p class="sub">Memuat data dari Google Sheet…</p><div id="dashErr"></div>`;
+  const st=d.stok, totStok=st.AMAN+st.ORDER+st.HABIS;
+  const okt=d.mutu.filter(x=>x.m==='OKT').pop();
+  const pem=d.bulan.reduce((a,b)=>a+b.v,0);
+  const groups=[...new Set(LINKS.map(l=>l.g))];
+  return `<h2>Dashboard ${esc(cfg.lab)}</h2>
+  <p class="sub">Data dibaca dari Google Sheet · dimuat ${esc(d.tglMuat)} · <a href="#" onclick="reloadDash();return false" style="color:var(--ac)">muat ulang</a></p>
+  <div class="grid">
+    ${kpi(pem.toLocaleString('id-ID'),'Total pemeriksaan 2026')}
+    ${kpi(okt?okt.v+'%':'–','Kesesuaian waktu tunggu, Oktober')}
+    ${kpi(st.AMAN+' / '+totStok,'Reagen aman dari item dengan status')}
+    ${kpi(st.HABIS,'Reagen habis')}
+    ${kpi('<span id="kpiTugas">–</span>','Tugas belum selesai (Google Tasks)')}
+  </div>
+  <div class="grid two" style="grid-template-columns:1fr 1fr;margin-top:18px">
+    <div class="card"><b>Kesesuaian waktu tunggu (%)</b><div style="margin-top:10px">${bars(d.mutu,160,'%')}</div></div>
+    <div class="card"><b>Pemeriksaan per bulan 2026</b><div style="margin-top:10px">${bars(d.bulan,160)}</div></div>
+    <div class="card"><b>Pemeriksaan terbanyak 2026</b><div style="margin-top:10px">${hbars(d.jenis)}</div></div>
+    <div class="card"><b>Status stok reagen</b><div style="margin-top:10px">${hbars([{l:'Aman',v:st.AMAN},{l:'Perlu order',v:st.ORDER},{l:'Habis',v:st.HABIS},{l:'Nonaktif',v:st.NONAKTIF}])}</div></div>
+    <div class="card"><b>Total kunjungan lab per tahun</b><div style="margin-top:10px">${bars(d.kunjungan,160)}</div></div>
+    <div class="card"><b>Agenda terdekat</b><div id="kpiAgenda" class="sub" style="margin-top:8px">${signedIn()?'Memuat…':'Masuk Google di menu Tugas &amp; Kalender.'}</div></div>
+  </div>
+  <h3 class="grp">Akses cepat</h3>
+  <div class="grid">${groups.map(g=>`<a class="card lnk" href="#tautan"><b>${esc(g)}</b><span class="sub" style="margin:0">${LINKS.filter(l=>l.g===g).length} tautan</span></a>`).join('')}</div>`;
+}
+async function reloadDash(){
+  dash=null;route();
+  try{dash=await loadDash();route()}catch(e){const el=$('#dashErr');if(el)el.innerHTML=`<div class="card"><span class="sub">${esc(e.message)}</span></div>`}
+}
+
+/* ============ DATA & EDIT ============ */
+let editName=TABS[0],editRows=[],origRows=[],canEdit=false;
+function vData(){
+  return `<h2>Data &amp; Edit</h2>
+  <p class="sub">${signedIn()?'Mode edit aktif: sel yang diubah (kuning) disimpan kembali ke Google Sheet.':'Mode baca. Masuk Google untuk mengedit dan menyimpan ke Google Sheet.'}</p>
+  <div class="card">
+    <div class="row">
+      <select id="tabSel" style="width:auto;margin:0;min-width:340px">${TABS.map(t=>`<option ${t===editName?'selected':''}>${esc(t)}</option>`).join('')}</select>
+      <button class="btn" onclick="openTab()">Buka tab</button>
+      ${signedIn()?`<button class="btn" id="saveBtn" onclick="saveTab()" disabled>Simpan perubahan</button>`:`<button class="btn ghost" onclick="signIn()">Masuk Google untuk edit</button>`}
+    </div>
+    <p class="sub" style="margin:10px 0 0">Sheet: ${esc(cfg.sheetId)}</p>
+    <div id="tabOut" class="scroll">Memuat…</div>
+  </div>`;
+}
+async function openTab(){
+  editName=$('#tabSel').value;
+  const out=$('#tabOut');out.innerHTML='Memuat…';
+  try{
+    if(signedIn()){ editRows=await fetchGrid(editName); canEdit=true; }
+    else{ editRows=(await fetchTab(editName)).map(r=>r.slice()); canEdit=false; }
+    origRows=editRows.map(r=>(r||[]).slice());
+    renderTab();
+  }catch(e){out.innerHTML=`<span class="sub">${esc(e.message)}</span>`}
+}
+function renderTab(){
+  const out=$('#tabOut');
+  const w=Math.max(1,...editRows.map(r=>(r||[]).length));
+  out.innerHTML='<table>'+editRows.slice(0,400).map((r,ri)=>'<tr>'+Array.from({length:w},(_,ci)=>{
+    const v=esc((r||[])[ci]??'');
+    return canEdit?`<td><input value="${v}" data-r="${ri}" data-c="${ci}" oninput="cellEdit(this)"></td>`:`<td>${v}</td>`;
+  }).join('')+'</tr>').join('')+'</table>';
+  updateSaveBtn();
+}
+function cellEdit(el){
+  const r=+el.dataset.r,c=+el.dataset.c;
+  editRows[r]=editRows[r]||[];editRows[r][c]=el.value;
+  el.classList.toggle('chg',(origRows[r]?.[c]??'')!==el.value);
+  updateSaveBtn();
+}
+function changedCells(){
+  const list=[];
+  editRows.forEach((r,ri)=>(r||[]).forEach((v,ci)=>{if((origRows[ri]?.[ci]??'')!==(v??''))list.push({ri,ci,v})}));
+  return list;
+}
+function updateSaveBtn(){const b=$('#saveBtn');if(b)b.disabled=changedCells().length===0}
+async function saveTab(){
+  const ch=changedCells();
+  if(!ch.length) return;
+  if(!confirm(`Simpan ${ch.length} sel ke tab "${editName}"?\n\nSel berisi rumus akan tertimpa jika Anda mengubahnya.`)) return;
+  try{
+    await gapi(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(cfg.sheetId)}/values:batchUpdate`,{method:'POST',body:{
+      valueInputOption:'USER_ENTERED',
+      data:ch.map(x=>({range:`'${editName}'!${colL(x.ci)}${x.ri+1}`,values:[[x.v]]}))
+    }});
+    delete cache[editName];dash=null;
+    origRows=editRows.map(r=>(r||[]).slice());
+    renderTab();toast(`${ch.length} sel tersimpan ke Google Sheet`);
+  }catch(e){toast('Gagal menyimpan: '+e.message)}
+}
+
+/* ============ TUGAS (Google Tasks & Kalender) ============ */
+async function defaultList(){
+  if(cfg.taskListId) return cfg.taskListId;
+  const d=await gapi('https://tasks.googleapis.com/tasks/v1/users/@me/lists?maxResults=1');
+  return d.items[0].id;
+}
+async function loadTasks(targetId='tasks'){
+  const list=await defaultList();
+  const d=await gapi(`https://tasks.googleapis.com/tasks/v1/lists/${encodeURIComponent(list)}/tasks?showCompleted=false&maxResults=50`);
+  const items=d.items||[];
+  const el=$('#'+targetId);
+  if(el) el.innerHTML=items.length?items.map(t=>`<div class="item"><input type="checkbox" class="done" style="width:auto;margin-top:4px" data-l="${esc(list)}" data-t="${esc(t.id)}"><div><b>${esc(t.title)}</b>${t.due?`<div class="sub" style="margin:2px 0 0">Jatuh tempo ${esc(t.due.slice(0,10))}</div>`:''}${t.notes?`<div class="sub" style="margin:2px 0 0">${esc(t.notes)}</div>`:''}</div></div>`).join(''):'<p class="sub">Tidak ada tugas yang belum selesai.</p>';
+  return items.length;
+}
+async function doneTask(el){
+  try{
+    await gapi(`https://tasks.googleapis.com/tasks/v1/lists/${encodeURIComponent(el.dataset.l)}/tasks/${encodeURIComponent(el.dataset.t)}`,{method:'PATCH',body:{status:'completed'}});
+    toast('Tugas ditandai selesai');loadTasks().catch(()=>{});
+  }catch(e){toast('Gagal: '+e.message);el.checked=false}
+}
+async function addTask(){
+  const judul=$('#tJudul').value.trim();
+  if(!judul) return toast('Judul wajib diisi');
+  const tgl=$('#tTgl').value,catatan=$('#tCatatan').value;
+  try{
+    const list=await defaultList();
+    const body={title:judul,notes:catatan};
+    if(tgl) body.due=tgl+'T00:00:00.000Z';
+    await gapi(`https://tasks.googleapis.com/tasks/v1/lists/${encodeURIComponent(list)}/tasks`,{method:'POST',body});
+    if($('#tKal').checked){
+      if(!tgl) return toast('Tugas tersimpan, tetapi isi tanggal untuk membuat acara kalender');
+      const start=`${tgl}T${$('#tJam').value||'08:00'}:00`;
+      const end=new Date(Date.parse(start+'Z')+(+$('#tDur').value||60)*60000).toISOString().slice(0,19);
+      await gapi(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(cfg.calId)}/events`,{method:'POST',body:{summary:judul,description:catatan,start:{dateTime:start,timeZone:'Asia/Makassar'},end:{dateTime:end,timeZone:'Asia/Makassar'}}});
+    }
+    toast('Catatan tugas tersimpan');route();
+  }catch(e){toast('Gagal: '+e.message)}
+}
+async function loadAgenda(targetId='agenda',max=10){
+  try{
+    const url=`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(cfg.calId)}/events?timeMin=${encodeURIComponent(new Date().toISOString())}&maxResults=${max}&singleEvents=true&orderBy=startTime`;
+    const items=(await gapi(url)).items||[];
+    const el=$('#'+targetId);
+    if(el) el.innerHTML=items.length?items.map(e=>{const s=e.start.dateTime||e.start.date;return `<div class="item"><div><b>${esc(e.summary||'(tanpa judul)')}</b><div class="sub" style="margin:2px 0 0">${esc(new Date(s).toLocaleString('id-ID',{dateStyle:'medium',timeStyle:e.start.dateTime?'short':undefined}))}</div></div></div>`}).join(''):'<p class="sub">Tidak ada agenda mendatang.</p>';
+  }catch(e){const el=$('#'+targetId);if(el) el.innerHTML=`<span class="sub">${esc(e.message)}</span>`}
+}
+function vTugas(){
+  return `<h2>Tugas &amp; Kalender</h2>
+  <p class="sub">Catatan tugas disimpan ke Google Tasks dan, jika dicentang, juga ke Google Kalender.</p>
+  ${signedIn()?'':`<div class="card"><p style="margin-top:0">Belum terhubung ke akun Google.</p><button class="btn" onclick="signIn()">Masuk dengan Google</button></div>`}
+  <div class="grid two" style="grid-template-columns:1fr 1fr;margin-top:14px">
+    <div class="card"><b>Catatan tugas baru</b>
+      <label>Judul</label><input id="tJudul" placeholder="Contoh: Kalibrasi fotometer">
+      <label>Catatan</label><textarea id="tCatatan" rows="3"></textarea>
+      <label>Tanggal</label><input type="date" id="tTgl">
+      <label><input type="checkbox" id="tKal" style="width:auto;margin:0"> Tambahkan juga ke Google Kalender</label>
+      <label>Jam mulai (untuk kalender)</label><input type="time" id="tJam" value="08:00">
+      <label>Durasi (menit)</label><input type="number" id="tDur" value="60" min="15" step="15">
+      <button class="btn" onclick="addTask()">Simpan</button>
+    </div>
+    <div class="card"><b>Agenda kalender (10 terdekat)</b><div id="agenda" class="sub" style="margin-top:8px">${signedIn()?'Memuat…':'–'}</div></div>
+  </div>
+  <h3 class="grp">Tugas belum selesai</h3>
+  <div class="card" id="tasks">${signedIn()?'Memuat…':'Masuk dengan Google untuk melihat tugas.'}</div>`;
+}
+
+/* ============ TAUTAN ============ */
+const linkCard=l=>`<a class="card lnk" data-s="${esc((l.n+' '+l.j+' '+l.k).toLowerCase())}" href="${esc(l.u)}" target="_blank" rel="noopener"><span class="tag">${esc(l.j)}</span><b>${esc(l.n)}</b><span class="sub" style="margin:0">${esc(l.k)}</span></a>`;
+function vTautan(){
+  const groups=[...new Set(LINKS.map(l=>l.g))];
+  return `<h2>Tautan</h2><p class="sub">Tautan dikelompokkan sesuai daftar PERMATA LAB.</p>
+  <input placeholder="Cari nama, jenis, atau keterangan…" oninput="filterLinks(this.value)">
+  <div id="linkList">${groups.map(g=>`<h3 class="grp">${esc(g)}</h3><div class="grid">${LINKS.filter(l=>l.g===g).map(linkCard).join('')}</div>`).join('')}</div>`;
+}
+function filterLinks(q){q=q.toLowerCase();document.querySelectorAll('#linkList [data-s]').forEach(e=>e.style.display=e.dataset.s.includes(q)?'':'none')}
+
+/* ============ PENGATURAN ============ */
+function vPengaturan(){
+  return `<h2>Pengaturan</h2><p class="sub">Disimpan di browser ini.</p>
+  <div class="card">
+    <label>Nama laboratorium (judul dashboard)</label><input id="sLab" value="${esc(cfg.lab)}">
+    <label>ID Google Sheet sumber</label><input id="sSheet" value="${esc(cfg.sheetId)}">
+    <label>Google OAuth Client ID</label><input id="sClient" value="${esc(cfg.clientId)}" placeholder="xxxx.apps.googleusercontent.com">
+    <label>ID Kalender (kosongkan untuk kalender utama)</label><input id="sCal" value="${esc(cfg.calId==='primary'?'':cfg.calId)}">
+    <label>ID daftar Google Tasks (kosongkan untuk daftar pertama)</label><input id="sList" value="${esc(cfg.taskListId)}">
+    <label>Tema</label><select id="sTheme"><option value="light">Terang</option><option value="dark">Gelap</option></select>
+    <div class="row"><button class="btn" onclick="saveSettings()">Simpan</button><button class="btn ghost" onclick="resetSettings()">Atur ulang</button></div>
+  </div>
+  <div class="card" style="margin-top:14px"><b>Mengaktifkan login Google (edit sheet, Tasks, Kalender)</b>
+    <ol class="sub" style="line-height:1.8">
+      <li>Di Google Cloud Console, buat project, lalu aktifkan <i>Google Sheets API</i>, <i>Google Calendar API</i>, dan <i>Tasks API</i>.</li>
+      <li>Buat OAuth Client ID tipe <i>Web application</i>. Tambahkan alamat situs Anda (misalnya https://namasitus.web.app) di "Authorized JavaScript origins". Untuk uji lokal, tambahkan http://localhost:8080.</li>
+      <li>Tempel Client ID di atas lalu simpan. Akun yang login harus punya akses edit ke Google Sheet sumber.</li>
+      <li>Sheet tetap bisa dibaca tanpa login selama dibagikan sebagai "Anyone with the link – Viewer".</li>
+    </ol></div>`;
+}
+function saveSettings(){
+  cfg={...cfg,lab:$('#sLab').value.trim()||DEF.lab,sheetId:$('#sSheet').value.trim()||DEF.sheetId,clientId:$('#sClient').value.trim(),calId:$('#sCal').value.trim()||'primary',taskListId:$('#sList').value.trim(),theme:$('#sTheme').value};
+  localStorage.setItem('simlab_cfg',JSON.stringify(cfg));
+  tokenClient=null;token=null;Object.keys(cache).forEach(k=>delete cache[k]);dash=null;
+  applyTheme();route();toast('Pengaturan disimpan');
+}
+function resetSettings(){
+  localStorage.removeItem('simlab_cfg');cfg={...DEF};tokenClient=null;token=null;dash=null;applyTheme();route();toast('Pengaturan dikembalikan ke awal');
+}
+
+/* ============ ROUTER ============ */
+const VIEWS={beranda:vBeranda,data:vData,tautan:vTautan,tugas:vTugas,pengaturan:vPengaturan};
+function route(){
+  applyTheme();
+  initGoogle();
+  const v=(location.hash||'#beranda').slice(1);
+  const name=VIEWS[v]?v:'beranda';
+  document.querySelectorAll('aside a').forEach(a=>a.classList.toggle('on',a.dataset.v===name));
+  $('#app').innerHTML=VIEWS[name]();
+  if(name==='beranda'){
+    if(!dash) loadDash().then(d=>{dash=d;route()}).catch(e=>{const el=$('#dashErr');if(el)el.innerHTML=`<div class="card"><span class="sub">${esc(e.message)}</span></div>`});
+    if(signedIn()){
+      loadTasks('none').then(n=>{const k=$('#kpiTugas');if(k)k.textContent=n}).catch(()=>{});
+      loadAgenda('kpiAgenda',3);
+    }
+  }
+  if(name==='data') openTab();
+  if(name==='tugas'&&signedIn()){loadTasks().catch(e=>toast(e.message));loadAgenda()}
+  if(name==='pengaturan') $('#sTheme').value=cfg.theme;
+}
+$('#app').addEventListener('change',e=>{if(e.target.classList.contains('done'))doneTask(e.target)});
+window.addEventListener('hashchange',route);
+window.addEventListener('load',()=>setTimeout(route,300));
+route();
+</script>
+</body>
+</html>
